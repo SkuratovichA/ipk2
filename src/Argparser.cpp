@@ -26,7 +26,7 @@ namespace Argparser {
                                 "\t\t[--udp|-u] UPD packets are shown.\n"
                                 "\t\t[--arp] ARP packets are shown.\n"
                                 "\t\t[--icmp] ICMP packets are shown.\n"
-                                "\t\tIf no protocol option is provided, all packets are captured.\n"
+                                "\t\tIf no protocol option is provided, all packets are being captured.\n"
                                 "\t]\n"
                                 "\t? {-n num}\n"
                                 "\t\t- number of sniffed packets.\n";
@@ -73,82 +73,80 @@ namespace Argparser {
                 {"arp",       no_argument,       nullptr,       'A'},
                 {"icmp",      no_argument,       nullptr,       'I'},
                 {"help",      no_argument,       nullptr,       'H'},
-                {nullptr, 0,             nullptr,       0}
+                {nullptr, 0,                     nullptr,       0}
         };
+        static char const *short_options = ":i:p:n:thu";
+        int option_index = 0;
 
         while (true) {
-            static char const *short_options = ":i:p:n:thu";
-            int option_index = 0;
-
             c = getopt_long(argc, argv, short_options, long_options, &option_index);
             if (-1 == c) {
                 break;
             }
             switch (c) {
-            case 0:
-                if (nullptr != long_options[option_index].flag) {
+                case 0:
+                    if (nullptr != long_options[option_index].flag) {
+                        break;
+                    }
+                    std::cout << "option: " << long_options[option_index].name;
+                    if (optarg) {
+                        std::cout << "with arg: " << optarg;
+                    }
+                    std::cout << std::endl;
+                    exit(-1);
+
+                case 'p':
+                    std::cout << "\t\tPORT " << optarg << std::endl;
+                    port = get_int_carefully(optarg);
+                    port_set = true;
                     break;
-                }
-                std::cout << "option: " << long_options[option_index].name;
-                if (optarg) {
-                    std::cout << "with arg: " << optarg;
-                }
-                std::cout << std::endl;
-                exit(-1);
 
-            case 'p':
-                std::cout << "\t\tPORT " << optarg << std::endl;
-                port = get_int_carefully(optarg);
-                port_set = true;
-                break;
+                case 'n':
+                    std::cout << "\t\tNUMBER OF CONNECTIONS: " << optarg << std::endl;
+                    number_of_packets = get_int_carefully(optarg);
+                    break;
 
-            case 'n':
-                std::cout << "\t\tNUMBER OF CONNECTIONS: " << optarg << std::endl;
-                number_of_packets = get_int_carefully(optarg);
-                break;
+                case 'H':
+                case 'h':
+                    print_help_and_exit(argv[0]);
+                    break;
 
-            case 'H':
-            case 'h':
-                print_help_and_exit(argv[0]);
-                break;
+                case 'E':
+                case 'i':
+                    std::cout << "INTERFACE: " << optarg << std::endl;
+                    interface = std::string(optarg);
+                    break;
 
-            case 'E':
-            case 'i':
-                std::cout << "INTERFACE: " << optarg << std::endl;
-                interface = std::string(optarg);
-                break;
+                    // ---
+                case 'T':
+                case 't':
+                    std::cout << "option TCP" << std::endl;
+                    set_flags_if_not_repeated("TCP", flags, FilterOptions::TCP_FLAG);
+                    break;
+                case 'U':
+                case 'u':
+                    std::cout << "option UDP" << std::endl;
+                    set_flags_if_not_repeated("UDF", flags, FilterOptions::UDP_FLAG);
+                    break;
+                case 'A':
+                    std::cout << "option ARP" << std::endl;
+                    set_flags_if_not_repeated("ARP", flags, FilterOptions::ARP_FLAG);
+                    break;
+                case 'I':
+                    std::cout << "option ICMP" << std::endl;
+                    set_flags_if_not_repeated("ICMP", flags, FilterOptions::ICMP_FLAG);
+                    break;
+                    // ---
 
-                // ---
-            case 'T':
-            case 't':
-                std::cout << "option TCP" << std::endl;
-                set_flags_if_not_repeated("TCP", flags, FilterOptions::TCP_FLAG);
-                break;
-            case 'U':
-            case 'u':
-                std::cout << "option UDP" << std::endl;
-                set_flags_if_not_repeated("UDF", flags, FilterOptions::UDP_FLAG);
-                break;
-            case 'A':
-                std::cout << "option ARP" << std::endl;
-                set_flags_if_not_repeated("ARP", flags, FilterOptions::ARP_FLAG);
-                break;
-            case 'I':
-                std::cout << "option ICMP" << std::endl;
-                set_flags_if_not_repeated("ICMP", flags, FilterOptions::ICMP_FLAG);
-                break;
-                // ---
+                case '?':
+                    std::cerr << "option:  " << long_options[option_index].name << std::endl;
+                    std::cerr << "Testing? -h|--help for more information." << std::endl;
+                    exit(-1);
 
-            case '?':
-                std::cerr << "option:  " << long_options[option_index].name << std::endl;
-                std::cerr << "Testing? -h|--help for more information." << std::endl;
-                exit(-1);
-
-            default:;
-                interface = "";
+                default:;
+                    interface = "";
             }
         }
-
 
         if (optind < argc) {
             std::cerr << "ERROR: non-option ARGV-elements: ";
