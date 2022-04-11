@@ -7,10 +7,13 @@
 #include "FilterCreator.h"
 #include <iostream>
 #include <cstdio>
+#include <cstdio>
 
 namespace FilterOptions {
     std::string get_filter_string(const uint8_t flags, const uint32_t port, const bool port_set) {
-        const std::string opts[] = {"tcp", "udp", "arp", "icmp or icmp6"};
+        const std::string opts[] = {
+                "tcp", "udp", "arp", "icmp or icmp6"
+        };
         // all flags are set
         uint8_t i = flags == 0 ? 0b1111 : flags;
         int32_t j = 0;
@@ -18,12 +21,12 @@ namespace FilterOptions {
         bool enclose_in_braces;
         std::string opt_string;
         for (; i != 0b0000; i >>= 1) {
-            if ((i & 1) == 1) {
+            if ((i & 0b0001) == 1) {
                 opt_string += insert_or ? std::string(" or ") + opts[j] : opts[j];
                 insert_or = true; // here, we know we'll need to insert "or" for the filter
-                j += 1;
             }
-        }
+            j += 1;
+    }
         enclose_in_braces = j > 1;
         if (enclose_in_braces) {
             opt_string = std::string("(") + opt_string + std::string(")");

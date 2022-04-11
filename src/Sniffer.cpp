@@ -19,6 +19,13 @@
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/udp.h>
+#include <netinet/tcp.h>
+#include <netinet/icmp6.h>
+#include <netinet/icmp_var.h>
+#include <netinet/ip_icmp.h>
+
 
 #include "structures.h"
 #include "PacketParser.h"
@@ -54,6 +61,7 @@ namespace Sniffer {
 
         // define number of packets
         this->number_of_packets = number_of_packets;
+        std::cout << "filter string: " << filter_expression << std::endl;
     }
 
     inline void print_mac_address(uint8_t *ma, const char *type) {
@@ -61,6 +69,14 @@ namespace Sniffer {
                 "%s MAC Address : %02X:%02X:%02X:%02X:%02X:%02X\n",
                 type,
                 ma[0], ma[1], ma[2], ma[3], ma[4], ma[5]
+        );
+    }
+
+    inline void print_ip_address(uint8_t *ip, const char *type) {
+        printf(
+                "%s IP Address: %d.%d.%d.%d\n",
+                type,
+                ip[0], ip[1], ip[2], ip[3]
         );
     }
 
@@ -80,60 +96,239 @@ namespace Sniffer {
         return {timestamp_str};
     }
 
-    void process_ipv4_packet(uint32_t hlen, uint32_t length, uint32_t len, Structures::my_ip const *ip) {
+    /*
+     * print data in rows of 16 bytes: offset   hex   ascii
+     *
+     * 00000   47 45 54 20 2f 20 48 54  54 50 2f 31 2e 31 0d 0a   GET / HTTP/1.1..
+     */
+    // https://www.tcpdump.org/other/sniffex.c
+    void print_hex_ascii_line(const u_char *payload, int len, int offset) {
+        const u_char *ch;
+        /* offset */
+        printf("%05d   ", offset);
+        /* hex */
+        ch = payload;
+        for (int i = 0; i < len; i++) {
+            printf("%02x ", *ch);
+            ch++;
+            /* print extra space after 8th byte for visual aid */
+            if (i == 7)
+                printf(" ");
+        }
+        /* print space to handle line less than 8 bytes */
+        if (len < 8)
+            printf(" ");
+
+        /* fill hex gap with spaces if not full line */
+        if (len < 16) {
+            for (int i = 0; i < 16 - len; i++) {
+                printf("   ");
+            }
+        }
+        printf("   ");
+        /* ascii (if printable) */
+        ch = payload;
+        for (int i = 0; i < len; i++) {
+            printf("%c", isprint(*ch) ? *ch : '.');
+            ch++;
+        }
+        printf("\n");
+        return;
+    }
+
+    /*
+     * print packet payload data (avoid printing binary data)
+     */
+    // https://www.tcpdump.org/other/sniffex.c
+    void print_payload(const u_char *payload, uint32_t len) {
+        int len_rem = len;
+        int line_width = 16; /* number of bytes per line */
+        int line_len;
+        int offset = 0; /* zero-based offset counter */
+        const u_char *ch = payload;
+
+        if (len == 0)
+            return;
+
+        /* data fits on one line */
+        if (len <= line_width) {
+            print_hex_ascii_line(ch, len, offset);
+            return;
+        }
+
+        /* data spans multiple lines */
+        while (true) {
+            /* compute current line length */
+            line_len = line_width % len_rem;
+            /* print line */
+            print_hex_ascii_line(ch, line_len, offset);
+            /* compute total remaining */
+            len_rem = len_rem - line_len;
+            /* shift pointer to remaining bytes to print */
+            ch = ch + line_len;
+            /* add offset */
+            offset = offset + line_width;
+            /* check if we have line width chars or less */
+            if (len_rem <= line_width) {
+                /* print last line and get out */
+                print_hex_ascii_line(ch, len_rem, offset);
+                break;
+            }
+        }
+
+        return;
+    }
+
+    void
+    handle_ip6_packet(u_char *packet_handler, const struct pcap_pkthdr *packet_header, const u_char *packet_data) {
+        std::cout << "Processing ipv6" << std::endl;
+        auto ip = (struct ip6_hdr *) (packet_data + sizeof(ether_header) /*14*/);
+        // https://stackoverflow.com/questions/66784119/getting-npcap-ipv6-source-and-destination-addresses?noredirect=1#comment118057497_66784119
+        // get suorce address
+        char str_saddr[INET6_ADDRSTRLEN];
+        memset(str_saddr, 0, sizeof(str_saddr));
+        inet_ntop(AF_INET6, &ip->ip6_src, str_saddr, INET6_ADDRSTRLEN);
+
+        // get destination address
+        char str_daddr[INET6_ADDRSTRLEN];
+        memset(str_daddr, 0, sizeof(str_daddr));
+        inet_ntop(AF_INET6, &ip->ip6_dst, str_daddr, INET6_ADDRSTRLEN);
+
+        printf("IP6 packet captured:\n");
+        printf("Source address: %s\n", str_saddr);
+        printf("Destination address: %s\n", str_daddr);
+
+        const udphdr *udp;
+        const tcphdr *tcp;
+        switch (ip->ip6_ctlun.ip6_un1.ip6_un1_nxt) {
+            case IPPROTO_TCP:
+                tcp = (struct tcphdr *) (packet_data + ETHER_ADDR_LEN + 40);
+                printf("Source port: %d\n", ntohs(tcp->th_sport));
+                printf("Destination port: %d\n", ntohs(tcp->th_dport));
+                break;
+            case IPPROTO_UDP:
+                udp = (struct udphdr *) (packet_data + ETHER_ADDR_LEN + 40);
+                printf("Source port: %d\n", ntohs(udp->uh_sport));
+                printf("Destination port: %d\n", ntohs(udp->uh_dport));
+                break;
+            default: // ICMP has neither source nor destination port
+                break;
+        }
+    }
+
+
+    // http://yuba.stanford.edu/~casado/pcap/disect2.c
+    void
+    handle_ip4_packet(u_char *packet_handler, const struct pcap_pkthdr *packet_header, const u_char *packet_data) {
+        uint32_t length = packet_header->len;
+
+        const ip *ip = (struct ip *) (packet_data + sizeof(ether_header) /*14*/);
+        /* jump pass the ethernet header */
+        if (length < sizeof(Structures::my_ip)) {
+            std::cerr << "truncated ip, length: " << length << std::endl;
+            return;
+        }
+        const auto len = ntohs(ip->ip_len);
+        const auto hlen = ip->ip_hl; /* header length */
         if (hlen < 5) {
             std::cerr << "bad-hlen: " << hlen << std::endl;
             return;
         }
         /* see if we have as much packet as we should */
         if (length < len) {
-            printf("\ntruncated IP - %d bytes missing\n", len - length);
+            printf("truncated IP - %d bytes missing\n", len - length);
             return;
         }
         auto off = ntohs(ip->ip_off);
         /* aka no 1's in first 13 bits*/
         if ((off & 0x1fff) == 0) {
-            /* print source destination hlen version len offset*/
-            printf("IP packet captured:\n");
-            printf("\tSource: %s\n", inet_ntoa(ip->ip_src));
-            printf("\tDestination: %s\n", inet_ntoa(ip->ip_dst));
-            printf("\thlen: %d, length: %d, offset: %d\n", hlen, len, off);
+            printf("IP4 packet captured:\n");
+            printf("Source address: %s\n", inet_ntoa(ip->ip_src));
+            printf("Destination address: %s\n", inet_ntoa(ip->ip_dst));
+            //printf("hlen: %d, length: %d, offset: %d\n", hlen, len, off);
         }
-        // todo: print more information about the packet
+
+        const udphdr *udp;
+        const tcphdr *tcp;
+        switch (ip->ip_p) {
+            case IPPROTO_TCP:
+                tcp = (struct tcphdr *) (packet_data + ETHER_ADDR_LEN + hlen * 4);
+                printf("Source port: %d\n", ntohs(tcp->th_sport));
+                printf("Destination port: %d\n", ntohs(tcp->th_dport));
+                break;
+            case IPPROTO_UDP:
+                udp = (struct udphdr *) (packet_data + ETHER_ADDR_LEN + hlen * 4);
+                printf("Source port: %d\n", ntohs(udp->uh_sport));
+                printf("Destination port: %d\n", ntohs(udp->uh_dport));
+                break;
+            default: // ICMP has neither source nor destination port
+                break;
+        }
     }
 
-    // http://yuba.stanford.edu/~casado/pcap/disect2.c
-    void handle_ip_packet(
-            u_char *packet_handler,
-            const struct pcap_pkthdr *packet_header,
-            const u_char *packet_data
-    ) {
-        const Structures::my_ip *ip;
-        uint32_t length = packet_header->len;
-        uint32_t hlen, version;
-        uint32_t i, len;
+//
+//    // http://yuba.stanford.edu/~casado/pcap/disect2.c
+//    void handle_ip4_packet(u_char *packet_handler, const struct pcap_pkthdr *packet_header, const u_char *packet_data) {
+//        uint32_t length = packet_header->len;
+//        uint32_t hlen;
+//        uint32_t len;
+//
+//        const ip *ip = (struct ip *) (packet_data + sizeof(ether_header) /*14*/);
+//        /* jump pass the ethernet header */
+//        if (length < sizeof(Structures::my_ip)) {
+//            std::cerr << "truncated ip, length: " << length << std::endl;
+//            return;
+//        }
+//        len = ntohs(ip->ip_len);
+//        hlen = ip->ip_hl; /* header length */
+//        if (hlen < 5) {
+//            std::cerr << "bad-hlen: " << hlen << std::endl;
+//            return;
+//        }
+//        /* see if we have as much packet as we should */
+//        if (length < len) {
+//            printf("truncated IP - %d bytes missing\n", len - length);
+//            return;
+//        }
+//        auto off = ntohs(ip->ip_off);
+//        /* aka no 1's in first 13 bits*/
+//        if ((off & 0x1fff) == 0) {
+//            printf("IP4 packet captured:\n");
+//            printf("Source: %s\n", inet_ntoa(ip->ip_src));
+//            printf("Destination: %s\n", inet_ntoa(ip->ip_dst));
+//            printf("hlen: %d, length: %d, offset: %d\n", hlen, len, off);
+//        }
+//
+//        const struct udphdr *udphdr;
+//        const struct tcphdr *tcphdr;
+//        const struct icmphdr *icmphdr;
+//        switch (ip->ip_p) {
+//            case IPPROTO_TCP: printf("TCP\n"); break;
+//            case IPPROTO_UDP:
+//                udphdr = (struct udphdr *)(packet_data + ETHER_ADDR_LEN);
+//
+//                break;
+//            case IPPROTO_ICMP:printf("ICMP\n"); break;
+//            case IPPROTO_IPV6:printf("V6\n"); break;
+//            case IPPROTO_IPV4:printf("v4\n"); break;
+//        }
+//    }
 
-        /* jump pass the ethernet header */
-        ip = (Structures::my_ip *) (packet_data + sizeof(ether_header));
-        if (length < sizeof(Structures::my_ip)) {
-            std::cerr << "truncated ip, length: " << length << std::endl;
-            return;
-        }
-        len = ntohs(ip->ip_len);
-        hlen = IP_HL(ip); /* header length */
-        version = IP_V(ip); /* ip version */
+    void
+    handle_arp_packet(u_char *packet_handler, const struct pcap_pkthdr *packet_header, const u_char *packet_data) {
+        auto *arp = (ether_arp *) (packet_data + sizeof(ether_header) /*14*/);
 
-        /* check version */
-        switch (version) {
-            case 4:
-                process_ipv4_packet(hlen, length, len, ip);
-            case 6:
-                // TODO: implement me
-                std::cerr << "IPV6 packet TODO" << std::endl;
-                //exit(228);
-                break;
-            default:
-                std::cerr << "Unknown ip packet version!: " << version << std::endl;
+        printf("ARP packet captured:");
+        printf("Format of hardware address: %s\n", (ntohs(arp->ea_hdr.ar_hrd) == 1) ? "Ethernet" : "Unknown");
+        printf("Format of protocol address type: %s\n", (ntohs(arp->ea_hdr.ar_pro) == 0x0800) ? "IPv4" : "Unknown");
+        printf("Operation: ARP %s\n", (ntohs(arp->ea_hdr.ar_op) == ARP_REQUEST) ? " Request" : " Reply");
+
+        /* If is Ethernet and IPv4, print packet contents */
+        if (ntohs(arp->ea_hdr.ar_hrd) == 1 && ntohs(arp->ea_hdr.ar_pro) == 0x0800) {
+            print_mac_address(arp->arp_sha, "Sender");
+            print_ip_address(arp->arp_spa, "Sender");
+            print_mac_address(arp->arp_tha, "Target");
+            print_ip_address(arp->arp_tpa, "Target");
         }
     }
 
@@ -167,20 +362,22 @@ namespace Sniffer {
         uint16_t ether_type = ntohs(ether->ether_type);
         std::string type = "DONT KNOW THE TYPE";
         switch (ether_type) {
-            case ETHERTYPE_IP:
-                // ipv{4,6} packets
-                handle_ip_packet(packet_handler, packet_header, packet_data);
+            case ETHERTYPE_IPV6: // ipv6
+                handle_ip6_packet(packet_handler, packet_header, packet_data);
+                break;
+            case ETHERTYPE_IP: // ipv4
+                handle_ip4_packet(packet_handler, packet_header, packet_data);
                 break;
             case ETHERTYPE_ARP:
-                break;
-            case ETHERTYPE_REVARP:
-                break;
-            case ETHERTYPE_PUP:
+                std::cerr << "ARP _________________________________________--_-" << std::endl;
+                handle_arp_packet(packet_handler, packet_header, packet_data);
                 break;
             default:
                 break;
         }
 
+        print_payload(packet_data, packet_header->len);
+        puts("\n");
         return nullptr;
     }
 
