@@ -1,15 +1,16 @@
-//
-// Created by sasha on 09.04.2022.
-//
+// File: Argparser.cpp
+// Author: Skuratovich Aliaksandr <xskura01@vutbr.cz>
+// Date: 12.4.2022
+// Brief: Namespace providing tools for parsing commandline arguments
+
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
 #include <getopt.h>
 #include "FilterCreator.h"
-
 #include "Argparser.h"
-namespace Argparser {
 
+namespace Argparser {
     void print_help_and_exit(const char *prg_name) {
         std::string name = std::string(prg_name);
         std::string hm = name + " opts\n"
@@ -34,7 +35,7 @@ namespace Argparser {
         exit(0);
     }
 
-    uint8_t get_int_carefully(char *val) {
+    inline uint8_t get_int_carefully(char *val) {
         try {
             return std::stoi(optarg);
         } catch (const std::invalid_argument &e) {
@@ -45,7 +46,7 @@ namespace Argparser {
 
     inline void set_flags_if_not_repeated(const char stropt[], uint8_t &flags, uint8_t val) {
         if ((flags & val) != 0) {
-            std::cerr << stropt << " again?!!!";
+            std::cerr << stropt << " the same argument must not be provided twice.\nSee --help for more information.";
             exit(-1);
         }
         flags |= val;
@@ -55,14 +56,15 @@ namespace Argparser {
         if (argc == 1) {
             print_help_and_exit(argv[0]);
         }
-        // flags:
+        // 8 bytes used to represent all flags program supports.
         uint8_t flags = 0b0000;
         uint32_t port = 0;
+        // port can be set only once
         bool port_set = false;
         std::string interface;
-        int number_of_packets = 0;
+        int number_of_packets = 1;
 
-        int c;
+        int getopt_option;
         static struct option long_options[] = {
                 // these options set a flag
                 {"verbose",   no_argument,       &verbose_flag, 1},
@@ -79,55 +81,56 @@ namespace Argparser {
         int option_index = 0;
 
         while (true) {
-            c = getopt_long(argc, argv, short_options, long_options, &option_index);
-            if (-1 == c) {
+            getopt_option = getopt_long(argc, argv, short_options, long_options, &option_index);
+            if (-1 == getopt_option) {
                 break;
             }
-            switch (c) {
+            switch (getopt_option) {
+                // unsupported option
                 case 0:
                     if (nullptr != long_options[option_index].flag) {
                         break;
                     }
-                    std::cout << "option: " << long_options[option_index].name;
+                    std::cerr << "Unsupported option: " << long_options[option_index].name;
                     if (optarg) {
-                        std::cout << "with arg: " << optarg;
+                        std::cerr << ", with argument: " << optarg;
                     }
-                    std::cout << std::endl;
+                    std::cerr << std::endl;
                     exit(-1);
-
+                // port
                 case 'p':
                     std::cout << "\t\tPORT " << optarg << std::endl;
                     port = get_int_carefully(optarg);
                     port_set = true;
                     break;
-
+                // number of connections
                 case 'n':
                     std::cout << "\t\tNUMBER OF CONNECTIONS: " << optarg << std::endl;
                     number_of_packets = get_int_carefully(optarg);
                     break;
-
+                // help message
                 case 'H':
                 case 'h':
                     print_help_and_exit(argv[0]);
                     break;
-
+                // interface
                 case 'E':
                 case 'i':
-                    std::cout << "INTERFACE: " << optarg << std::endl;
                     interface = std::string(optarg);
                     break;
-
-                    // ---
+                // tcp
                 case 'T':
                 case 't':
                     std::cout << "option TCP" << std::endl;
                     set_flags_if_not_repeated("TCP", flags, FilterOptions::TCP_FLAG);
                     break;
+                // udp
                 case 'U':
                 case 'u':
                     std::cout << "option UDP" << std::endl;
                     set_flags_if_not_repeated("UDF", flags, FilterOptions::UDP_FLAG);
                     break;
+                // arp
                 case 'A':
                     std::cout << "option ARP" << std::endl;
                     set_flags_if_not_repeated("ARP", flags, FilterOptions::ARP_FLAG);
@@ -136,13 +139,10 @@ namespace Argparser {
                     std::cout << "option ICMP" << std::endl;
                     set_flags_if_not_repeated("ICMP", flags, FilterOptions::ICMP_FLAG);
                     break;
-                    // ---
-
                 case '?':
                     std::cerr << "option:  " << long_options[option_index].name << std::endl;
                     std::cerr << "Testing? -h|--help for more information." << std::endl;
                     exit(-1);
-
                 default:;
                     interface = "";
             }

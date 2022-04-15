@@ -1,3 +1,7 @@
+// File: main.cpp
+// Author: Skuratovich Aliaksandr <xskura01@vutbr.cz>
+// Date: 12.4.2022
+
 #include <cstdlib>
 #include <iostream>
 #include <csignal>
@@ -9,11 +13,12 @@
 static int verbose_flag;
 
 void handler(int signum) {
-    std::cerr << "Do I need to free memory or resources?";
+    std::cerr << "CTRL+C key pressed. Exiting..." << std::endl;
     exit(0);
 }
 
 int main(int argc, char **argv) {
+    // setting signal handler
     signal(SIGINT, handler);
     Argparser::program_arguments_t args = Argparser::argparser(argc, argv, verbose_flag);
     std::cerr << "flags" << args.flags << std::endl;

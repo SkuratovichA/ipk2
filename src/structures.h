@@ -1,6 +1,6 @@
-//
-// Created by sasha on 10.04.2022.
-//
+// File: structures.h
+// Author: Skuratovich Aliaksandr <xskura01@vutbr.cz>
+// Date: 12.4.2022
 
 #pragma once
 
@@ -11,7 +11,6 @@ namespace Structures {
 #define ETHERTYPE_IPv4 0x0800 /* IPv4 */
 #define ETHERTYPE_ARP 0x0806 /* Address resolution */
 #define ETHERTYPE_REVARP 0x8035 /* Reverse ARP */
-#define ETHER_ADDR_LEN 6
 #define ETHER_HDRLEN 14
 
 /* ARP Header, (assuming Ethernet+IPv4) */

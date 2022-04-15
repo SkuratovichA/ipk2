@@ -1,6 +1,6 @@
-//
-// Created by sasha on 09.04.2022.
-//
+// File: Sniffer.h
+// Author: Skuratovich Aliaksandr <xskura01@vutbr.cz>
+// Date: 12.4.2022
 
 #pragma once
 #include <pcap.h>
@@ -15,6 +15,7 @@ namespace Sniffer {
         // functions
     public:
         Sniffer(const std::string&, const std::string&, int);
+        ~Sniffer();
         void sniff_packets() const;
     private:
         static void print_all_devices_and_exit();

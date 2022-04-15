@@ -1,6 +1,6 @@
-//
-// Created by sasha on 09.04.2022.
-//
+// File: FileCreator.h
+// Author: Skuratovich Aliaksandr <xskura01@vutbr.cz>
+// Date: 12.4.2022
 
 #pragma once
 

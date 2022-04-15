@@ -10,5 +10,5 @@ set(PROJECT_SOURCE_DIR src/)
 # give all source files
 FILE(GLOB SOURCE_FILES ${PROJECT_SOURCE_DIR}/*.cpp)
 
-add_executable(ipk ${SOURCE_FILES} src/structures.h src/PacketParser.cpp src/PacketParser.h)
+add_executable(ipk ${SOURCE_FILES} src/structures.h)
 target_link_libraries(ipk pcap)
