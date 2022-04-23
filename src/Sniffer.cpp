@@ -57,7 +57,6 @@ namespace Sniffer {
         }
         // define number of packets
         this->number_of_packets = number_of_packets;
-        std::cout << "filter string: " << filter_expression << std::endl;
     }
 
     /** Print MAC address
@@ -66,7 +65,7 @@ namespace Sniffer {
      */
     inline void print_mac_address(uint8_t *ma, const char *type) {
         printf(
-                "%s MAC Address : %02X:%02X:%02X:%02X:%02X:%02X\n",
+                "%s MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
                 type,
                 ma[0], ma[1], ma[2], ma[3], ma[4], ma[5]
         );
@@ -84,31 +83,33 @@ namespace Sniffer {
         );
     }
 
-    /** Getting timestamp in R3339 format.
+    /** Getting timestamp in RFC3339 format.
      * @param ts
-     * @return
+     * @return string in RFC3339 format
      */
     std::string get_timestamp(const timeval &ts) {
-        char tmbuf[sizeof("YYYY-mm-ddTHH:MM:SS") + sizeof('\0')];
+        char tmbuf[sizeof("YYYY-mm-dd HH:MM:SS") + sizeof('\0')];
         char zone[sizeof("+HH:HH") + sizeof('\0')];
         char timestamp_str[sizeof(zone) + sizeof(tmbuf) + sizeof(".msmsms")];
-        std::string zone_tz{};
         time_t timestamp = ts.tv_sec;
-        tm *tm_loc = localtime(&timestamp);
-        strftime(tmbuf, sizeof(tmbuf), "%Y-%m-%dT%H:%M:%S", tm_loc);
-        strftime(zone, sizeof(zone), "%z", tm_loc);
-        zone_tz.insert(zone_tz.end(), {zone[0], zone[1], zone[2], ':', zone[3], zone[4]});
-        zone_tz = strcmp("+0000", zone) == 0 ? "Z" : zone_tz;
+        std::string timezone_3339{};
+
+        tm *lt_timestemp = localtime(&timestamp);
+        strftime(tmbuf, sizeof(tmbuf), "%Y-%m-%d %H:%M:%S", lt_timestemp);
+        strftime(zone, sizeof(zone), "%z", lt_timestemp);
+
+        timezone_3339.insert(timezone_3339.begin(), {zone[0], zone[1], zone[2], ':', zone[3], zone[4]});
+        timezone_3339 = strcmp("+0000", zone) == 0 ? "Z" : timezone_3339;
 #ifdef __APPLE__
 #define FMT "d"
 #else
 #define FMT "ld"
 #endif
-        snprintf(timestamp_str, sizeof(timestamp_str), "%s.%06" FMT"%s", tmbuf, ts.tv_usec, zone_tz.c_str());
+        snprintf(timestamp_str, sizeof(timestamp_str), "%s.%06" FMT"%s", tmbuf, ts.tv_usec, timezone_3339.c_str());
         return {timestamp_str};
+#undef FMT
     }
 
-     */
     /** Print data in rows of 16 bytes: offset   hex   ascii
      * Taken from https://www.tcpdump.org/other/sniffex.c
      * @param payload
@@ -141,8 +142,13 @@ namespace Sniffer {
         printf("   ");
         // ascii (if printable)
         ch = payload;
-        for (int i = 0; i < len; i++) {
+        int j = 0;
+        for (int i = 0; i < len; i++ ) {
             printf("%c", isprint(*ch) ? *ch : '.');
+            if ((j+1) % 8 == 0) {
+                printf(" ");
+            }
+            j = *ch == '\n' ? 0 : j+1;
             ch++;
         }
         printf("\n");
@@ -200,7 +206,7 @@ namespace Sniffer {
             const u_char *packet_data
     ) {
         auto ip = (struct ip6_hdr *) (packet_data + sizeof(ether_header) /*14*/);
-        // get suorce address
+        // get source address
         char str_saddr[INET6_ADDRSTRLEN];
         memset(str_saddr, 0, sizeof(str_saddr));
         inet_ntop(AF_INET6, &ip->ip6_src, str_saddr, INET6_ADDRSTRLEN);
@@ -210,22 +216,22 @@ namespace Sniffer {
         memset(str_daddr, 0, sizeof(str_daddr));
         inet_ntop(AF_INET6, &ip->ip6_dst, str_daddr, INET6_ADDRSTRLEN);
 
-        printf("IP6 packet captured:\n");
-        printf("Source address: %s\n", str_saddr);
-        printf("Destination address: %s\n", str_daddr);
+        std::cout << "src IP: " << str_saddr << std::endl;
+        std::cout << "dst IP: " << str_daddr << std::endl;
 
         const udphdr *udp;
         const tcphdr *tcp;
+        const Structures::icmphdr *icmp;
         switch (ip->ip6_ctlun.ip6_un1.ip6_un1_nxt) {
             case IPPROTO_TCP:
-                tcp = (struct tcphdr *) (packet_data + ETHER_ADDR_LEN + 40);
-                printf("Source port: %d\n", ntohs(tcp->th_sport));
-                printf("Destination port: %d\n", ntohs(tcp->th_dport));
+                tcp = (struct tcphdr *) (packet_data + ETHER_ADDR_LEN + 40 /*ipv6 header size*/);
+                std::cout << "src port: " <<  ntohs(tcp->th_sport) << std::endl;
+                std::cout << "dst port: " << ntohs(tcp->th_dport) << std::endl;
                 break;
             case IPPROTO_UDP:
-                udp = (struct udphdr *) (packet_data + ETHER_ADDR_LEN + 40);
-                printf("Source port: %d\n", ntohs(udp->uh_sport));
-                printf("Destination port: %d\n", ntohs(udp->uh_dport));
+                udp = (struct udphdr *) (packet_data + ETHER_ADDR_LEN + 40 /*ipv6 header size*/);
+                printf("src port: %d\n", ntohs(udp->uh_sport));
+                printf("dst port: %d\n", ntohs(udp->uh_dport));
                 break;
             default: // ICMP has neither source nor destination port
                 break;
@@ -246,11 +252,6 @@ namespace Sniffer {
         uint32_t length = packet_header->len;
 
         const ip *ip = (struct ip *) (packet_data + sizeof(ether_header) /*14*/);
-        /* jump pass the ethernet header */
-        if (length < sizeof(Structures::my_ip)) {
-            std::cerr << "truncated ip, length: " << length << std::endl;
-            return;
-        }
         const auto len = ntohs(ip->ip_len);
         const auto hlen = ip->ip_hl; /* header length */
         if (hlen < 5) {
@@ -265,10 +266,8 @@ namespace Sniffer {
         auto off = ntohs(ip->ip_off);
         /* aka no 1's in first 13 bits*/
         if ((off & 0x1fff) == 0) {
-            printf("IP4 packet captured:\n");
-            printf("Source address: %s\n", inet_ntoa(ip->ip_src));
-            printf("Destination address: %s\n", inet_ntoa(ip->ip_dst));
-            //printf("hlen: %d, length: %d, offset: %d\n", hlen, len, off);
+            printf("src IP: %s\n", inet_ntoa(ip->ip_src));
+            printf("dst IP: %s\n", inet_ntoa(ip->ip_dst));
         }
 
         const udphdr *udp;
@@ -276,13 +275,13 @@ namespace Sniffer {
         switch (ip->ip_p) {
             case IPPROTO_TCP:
                 tcp = (struct tcphdr *) (packet_data + ETHER_ADDR_LEN + hlen * 4);
-                printf("Source port: %d\n", ntohs(tcp->th_sport));
-                printf("Destination port: %d\n", ntohs(tcp->th_dport));
+                printf("src port: %d\n", ntohs(tcp->th_sport));
+                printf("dst port: %d\n", ntohs(tcp->th_dport));
                 break;
             case IPPROTO_UDP:
                 udp = (struct udphdr *) (packet_data + ETHER_ADDR_LEN + hlen * 4);
-                printf("Source port: %d\n", ntohs(udp->uh_sport));
-                printf("Destination port: %d\n", ntohs(udp->uh_dport));
+                printf("src port: %d\n", ntohs(udp->uh_sport));
+                printf("dst port: %d\n", ntohs(udp->uh_dport));
                 break;
             default: // ICMP has neither source nor destination port
                 break;
@@ -302,16 +301,13 @@ namespace Sniffer {
     ) {
         auto *arp = (ether_arp *) (packet_data + sizeof(ether_header) /*14*/);
 
-        printf("Format of hardware address: %s\n", (ntohs(arp->arp_hrd) == 1) ? "Ethernet" : "Unknown");
-        printf("Format of protocol address type: %s\n", (ntohs(arp->arp_pro) == 0x0800) ? "IPv4" : "Unknown");
         printf("Operation: ARP %s\n", (ntohs(arp->ea_hdr.ar_op) == ARP_REQUEST) ? " Request" : " Reply");
 
-        // If is Ethernet and IPv4, print packet contents
-        if (ntohs(arp->ea_hdr.ar_hrd) == ARPHRD_ETHER && ntohs(arp->ea_hdr.ar_pro) == 0x0800 /*IPV4*/) {
-            print_mac_address(arp->arp_sha, "Sender");
-            print_ip_address(arp->arp_spa, "Sender");
-            print_mac_address(arp->arp_tha, "Target");
-            print_ip_address(arp->arp_tpa, "Target");
+        if (ntohs(arp->ea_hdr.ar_hrd) == ARPHRD_ETHER) {
+            print_ip_address(arp->arp_spa, "src");
+            print_ip_address(arp->arp_tpa, "dst");
+            print_mac_address(arp->arp_sha, "src");
+            print_mac_address(arp->arp_tha, "dst");
         }
     }
 
@@ -328,7 +324,6 @@ namespace Sniffer {
             const struct pcap_pkthdr *packet_header,
             const u_char *packet_data
     ) {
-        puts("+-------------------------------------------+");
         // timestamp
         std::string timestamp = get_timestamp(packet_header->ts);
         // getting data
@@ -339,11 +334,10 @@ namespace Sniffer {
         uint8_t *dst = ether->ether_dhost;
         uint8_t *src = ether->ether_shost;
 
-        std::cout << "TIMESTAMP: " << timestamp << std::endl;
-        print_mac_address(dst, "Destination");
-        print_mac_address(src, "Source");
-        std::cout << "EXPECTED SIZE: " << size << "B" << std::endl;
-        std::cout << "TOTAL PACKET AVAILABLE: " << caplen << "B" << std::endl;
+        std::cout << "timestamp: " << timestamp << std::endl;
+        print_mac_address(dst, "dst");
+        print_mac_address(src, "src");
+        std::cout << "frame length: " << caplen << "B" << std::endl;
 
         uint16_t ether_type = ntohs(ether->ether_type);
         switch (ether_type) {
@@ -417,7 +411,7 @@ namespace Sniffer {
         exit(0);
     }
 
-    /** While distructing the object, there is a need to use pcap_close() function.
+    /** While deleting the object, there is a need to use pcap_close() function.
      *
      */
     Sniffer::~Sniffer() {

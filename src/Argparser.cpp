@@ -99,13 +99,11 @@ namespace Argparser {
                     exit(-1);
                 // port
                 case 'p':
-                    std::cout << "\t\tPORT " << optarg << std::endl;
                     port = get_int_carefully(optarg);
                     port_set = true;
                     break;
                 // number of connections
                 case 'n':
-                    std::cout << "\t\tNUMBER OF CONNECTIONS: " << optarg << std::endl;
                     number_of_packets = get_int_carefully(optarg);
                     break;
                 // help message
@@ -121,22 +119,18 @@ namespace Argparser {
                 // tcp
                 case 'T':
                 case 't':
-                    std::cout << "option TCP" << std::endl;
                     set_flags_if_not_repeated("TCP", flags, FilterOptions::TCP_FLAG);
                     break;
                 // udp
                 case 'U':
                 case 'u':
-                    std::cout << "option UDP" << std::endl;
                     set_flags_if_not_repeated("UDF", flags, FilterOptions::UDP_FLAG);
                     break;
                 // arp
                 case 'A':
-                    std::cout << "option ARP" << std::endl;
                     set_flags_if_not_repeated("ARP", flags, FilterOptions::ARP_FLAG);
                     break;
                 case 'I':
-                    std::cout << "option ICMP" << std::endl;
                     set_flags_if_not_repeated("ICMP", flags, FilterOptions::ICMP_FLAG);
                     break;
                 case '?':

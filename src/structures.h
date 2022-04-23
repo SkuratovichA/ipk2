@@ -17,19 +17,24 @@ namespace Structures {
 // http://www.programming-pcap.aldabaknocking.com/code/arpsniffer.c
 #define ARP_REQUEST 1   /* ARP Request */
 #define ARP_REPLY 2     /* ARP Reply */
-    struct arphdr {
-        u_int16_t ar_hrd; /* Hardware Type */
-        u_int16_t ar_pro; /* Protocol Type */
-        u_char hlen; /* Hardware Address Length */
-        u_char plen; /* Protocol Address Length */
-        u_int16_t ar_op; /* Operation Code */
-        u_char sha[6]; /* Sender hardware address */
-        u_char spa[4]; /* Sender IP address */
-        u_char tha[6]; /* Target hardware address */
-        u_char tpa[4]; /* Target IP address */
+
+    /*https://sites.uclouvain.be/SystInfo/usr/include/netinet/ip_icmp.h.html*/
+    struct icmphdr {
+        u_int8_t type; /* message type */
+        u_int8_t code; /* type sub-code */
+        u_int16_t checksum;
+        union {
+            struct {
+                u_int16_t id;
+                u_int16_t sequence;
+            } echo; /* echo datagram */
+            u_int32_t gateway; /* gateway address */
+            struct {
+                u_int16_t        __unused;
+                u_int16_t mtu;
+            } frag; /* path mtu discovery */
+        } un;
     };
-
-
     //http://yuba.stanford.edu/~casado/pcap/section4.html
     struct my_ip {
         u_int8_t ip_vhl; /* header length, version */
@@ -48,34 +53,10 @@ namespace Structures {
         struct in_addr ip_src, ip_dst; /* source and dest address */
     };
 
-    /* This is a name for the 48 bit ethernet address available on many
-   systems.  */
-    struct ether_addr {
-        u_int8_t ether_addr_octet[ETHER_ADDR_LEN];
-    } __attribute__ ((__packed__));
-
     // https://gauravsarma1992.medium.com/packet-sniffer-and-parser-in-c-c86070081c38
     struct ether_header {
         uint8_t ether_dhost[ETHER_ADDR_LEN];
         uint8_t ether_shost[ETHER_ADDR_LEN];
         uint16_t ether_type; // IP? ARP? ...
     }__attribute__ ((__packed__));;
-
-    // https://www.winpcap.org/docs/docs_412/html/group__wpcap__tut6.html
-    /* 4 bytes IP address */
-    struct ip_address {
-        uint8_t byte1;
-        uint8_t byte2;
-        uint8_t byte3;
-        uint8_t byte4;
-    };
-
-    /* UDP header*/
-    struct udp_header {
-        uint16_t sport;          // Source port
-        uint16_t dport;          // Destination port
-        uint16_t len;            // Datagram length
-        uint16_t crc;            // Checksum
-    };
-
 }
