@@ -112,8 +112,8 @@ Where the `[parameters]` can be:
 
 4. Create 10 IPV6 packets with multivariate gaussian distribution.
    equation for multivariate gaussian distribution in latex:
-   $$
+   ```math
    \mathcal{N}({\bf{\mu}},\,{\bf\Sigma}) = \frac{1}{\sqrt{(2\pi)^D\cdot|{\bf\Sigma}|}}\cdot{{e}^{-\frac{1}{2}{\bf(x-\mu)}{\bf\Sigma^{-1}}{\bf(x-\mu)}^T}}
-   $$
+   ```
    And plaintext representation is:`\mathcal{N}({\bf{\mu}},\,{\bf\Sigma}) = \frac{1}{\sqrt{(2\pi)^D\cdot|{\bf\Sigma}|}}\cdot{{e}^{-\frac{1}{2}{\bf(x-\mu)}{\bf\Sigma^{-1}}{\bf(x-\mu)}^T}}`
    ![Captured packets](imgs/gauss.png "Beautiful multivariate Normal Distribution")
