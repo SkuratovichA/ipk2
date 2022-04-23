@@ -82,7 +82,7 @@ def main():
     defcount = 42
     defmsg = "tristatriatricet stribrnych paketu preletelo pres tristatriatricet stribrnych rozhrani"
     args = {
-        'protocol': ([defproto], f"Protocol string. One of arp, ipv{{4,6}}, ucp, tcp, m&ms, KFC, H&M... If not specified, '{defproto}' is used."),
+        'protocol': ([defproto], f"Protocol string. One of arp, ipv{{4,6}}, udp, tcp, m&ms, KFC, H&M... If not specified, '{defproto}' is used."),
         'port': (defport, f"Port number. If not specified, {defport} is used."),
         'interface': ([INTERFACE], f"Interface.If not specified, {INTERFACE} is used."),
         'count': ([defcount], f"Number of accepted packets. If not specified, {defcount} packets are sent."),

@@ -13,24 +13,21 @@
 namespace Argparser {
     void print_help_and_exit(const char *prg_name) {
         std::string name = std::string(prg_name);
-        std::string hm = name + " opts\n"
-                                "\topts:\n"
-                                "\t ! {-i interface | --interface interface}\n"
-                                "\t\t- only one interface packets will be sniffed on\n"
-                                "\t\t- If not provided or is provided without a value, a list of active interfaces is printed\n"
-                                "\t? [-p port]\n"
-                                "\t\t- packets will be filtered on the interface w.r.t. port\n"
-                                "\t\t- If not provided, all ports are used.\n"
-                                "\t\t- If provided, ports are used both from src and dst.\n"
-                                "\t? [\n"
-                                "\t\t[--tcp|-t] TCP packets are shown.\n"
-                                "\t\t[--udp|-u] UPD packets are shown.\n"
-                                "\t\t[--arp] ARP packets are shown.\n"
-                                "\t\t[--icmp] ICMP packets are shown.\n"
-                                "\t\tIf no protocol option is provided, all packets are being captured.\n"
-                                "\t]\n"
-                                "\t? {-n num}\n"
-                                "\t\t- number of sniffed packets.\n";
+        std::string hm = name +
+           "Where `[parameters]` are:\n"
+           "* `[-h|--help] print help message and exit\n`"
+           "* `[-i|--interface] interface` one interface packets will be sniffed on.\n"
+           " \t- If not provided or is provided without a value, a list of active interfaces is printed and program terminates.\n"
+           "* `-p port` packets will be filtered on the interface w.r.t. port\n"
+           "\t* If not provided, all ports are used.\n"
+           "\t* If provided, ports are used both from src and dst.\n"
+           "* `[--tcp|-t]` TCP packets are shown.\n"
+           "* `[--udp|-u]` UPD packets are shown.\n"
+           "* `[--arp]`  ARP packets are shown.\n"
+           "* `[--icmp]` ICMP packets are shown.\n"
+           "\t* If no option for protocol is provided, all packets are being captured.\n"
+           "* `-n num` number of sniffed packets. \n"
+           "\t* If not provided, only one packet is captured.\n";
         std::cout << hm << std::endl;
         exit(0);
     }

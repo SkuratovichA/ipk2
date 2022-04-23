@@ -392,20 +392,19 @@ namespace Sniffer {
         pcap_if_t *all_devices;
         if (pcap_findalldevs(&all_devices, errbuf) == -1) {
             std::cerr
-                    << "Cannot find devices. Probably you don't have root privelegies. Try to run the program as root."
+                    << "Cannot find devices. Probably you don't have root privileges. Try to run the program as root."
                     << std::endl;
             exit(-1);
         }
         pcap_if_t *cur = all_devices;
         if (cur == nullptr) {
             std::cerr
-                    << "Device list is empty. Probably you don't have root privelegies. Try to run the program as root."
+                    << "Device list is empty. Probably you don't have root privileges. Try to run the program as root."
                     << std::endl;
             exit(-1);
         }
         while (cur != nullptr) {
-            std::cout << "Device: " << cur->name << (cur->description ? cur->description : " (no description)")
-                      << std::endl;
+            std::cout << "Device: " << cur->name << (cur->description ? cur->description : "") << std::endl;
             cur = cur->next;
         }
         exit(0);
