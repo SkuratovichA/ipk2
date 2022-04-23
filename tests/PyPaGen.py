@@ -33,8 +33,10 @@ class Packet:
         :param msg: Message to add to the packet data.
         """
         self.interface = "".join(interface)
+        self.port = int("".join(port))
         msg = "".join(msg)
         protocol = "".join(protocol)
+
         try:
             ip6addr = netifaces.ifaddresses(self.interface)[netifaces.AF_INET6][0]["addr"]
             ipaddr = netifaces.ifaddresses(self.interface)[netifaces.AF_INET][0]["addr"]
@@ -53,10 +55,10 @@ class Packet:
             case "ipv6":
                 self.packet = self.ether / IPv6(dst=ip6addr, src=ip6addr) / ICMPv6EchoRequest(data=msg)
             case "tcp":
-                self.packet = self.ether / self.tcp_udp_ip / TCP(dport=[666, 420], sport=port,
+                self.packet = self.ether / self.tcp_udp_ip / TCP(dport=self.port, sport=self.port,
                                                                  flags="S") / self.tcp_udp_msg
             case "udp":
-                self.packet = self.ether / self.tcp_udp_ip / UDP(dport=port, sport=port) / self.tcp_udp_msg
+                self.packet = self.ether / self.tcp_udp_ip / UDP(dport=self.port, sport=self.port) / self.tcp_udp_msg
             case _ as dn:
                 raise ValueError(f"Unsupported protocol: {dn}.")
 
@@ -78,12 +80,12 @@ def psender(kwargs):
 
 def main():
     defproto = "ipv4"
-    defport = 42690
-    defcount = 42
+    defport = "42690"
+    defcount = "42"
     defmsg = "tristatriatricet stribrnych paketu preletelo pres tristatriatricet stribrnych rozhrani"
     args = {
         'protocol': ([defproto], f"Protocol string. One of arp, ipv{{4,6}}, udp, tcp, m&ms, KFC, H&M... If not specified, '{defproto}' is used."),
-        'port': (defport, f"Port number. If not specified, {defport} is used."),
+        'port': ([defport], f"Port number. If not specified, {defport} is used."),
         'interface': ([INTERFACE], f"Interface.If not specified, {INTERFACE} is used."),
         'count': ([defcount], f"Number of accepted packets. If not specified, {defcount} packets are sent."),
         'msg': ([defmsg], f"Message in packet data. If not specified, '{defmsg}' is added to the packet data.")
