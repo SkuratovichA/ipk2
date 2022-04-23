@@ -15,7 +15,7 @@ namespace Argparser {
         std::string name = std::string(prg_name);
         std::string hm = name +
            "Where `[parameters]` are:\n"
-           "* `[-h|--help] print help message and exit\n`"
+           "* `[-h|--help]` print help message and exit\n"
            "* `[-i|--interface] interface` one interface packets will be sniffed on.\n"
            " \t- If not provided or is provided without a value, a list of active interfaces is printed and program terminates.\n"
            "* `-p port` packets will be filtered on the interface w.r.t. port\n"

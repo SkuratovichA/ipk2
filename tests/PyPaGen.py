@@ -1,3 +1,4 @@
+# File: PyPaGen.py
 # Author: Skuratovich Aliaksadr
 # Date: 15.4.2022
 

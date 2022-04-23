@@ -22,15 +22,22 @@ Libraries used in the project are:
 ```bash
 git clone https://github.com/SkuratovichA/ipk2 && cd ipk2
 ```
-2. Make folder where binaries and build files will be stored
+CMake building system:
+1. Make folder where binaries and build files will be stored
 ```bash
 mkdir build
 ```
-3. Run `CMake` application to create a `Makefile`
+2. Run `CMake` application to create a `Makefile`
 ```bash
 cmake ../
 ```
-4. Run make command to compile binaries.
+3. Run make command to compile binaries.
+```bash
+make
+```
+
+Makefile:
+1. Compile the project.
 ```bash
 make
 ```
